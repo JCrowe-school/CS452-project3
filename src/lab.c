@@ -124,7 +124,8 @@ void mergesort_mt(int *A, int n, int num_thread) {
 
     if(pthread_create(&(sorters[i]->tid), NULL, parallel_mergesort, sorters[i]) != 0) {
       perror("Error creating thread!");
-      free(sorters[i]->A);
+      for(int j = i; j >= 0; j--) free(sorters[j]);
+      free(A);
       exit(EXIT_FAILURE);
     }
 
@@ -138,31 +139,35 @@ void mergesort_mt(int *A, int n, int num_thread) {
   }
 
   //time to finish sorting
-  int *temp = (int *)malloc(sizeof(int) * n);
-  if(temp == NULL) {perror("Unable to allocate temp array for sorting!"); free(A); exit(EXIT_FAILURE);}
-
   for(int i = 0; i < n; i++) {
-    int min = -1; //min index location
+    int min = i; //min index location, starting at i
+    int s = 0; //min sorters index
 
-    for(int j = 0; j < num_thread; j++) {
-      if(sorters[j]->start != -1) { //skip partitions that've been completed
-        if(min == -1) {//if j is the first valid index
-          min = j;
-        } else {
-          min = (A[sorters[j]->start] < A[sorters[min]->start]) ? j : min;
+    //A[i] within a partition will be the min value for that position, as such start with j = 1 since A[i] is already the smallest value within sorters[0]
+    for(int j = 1; j < num_thread -1; j++) { //the final partition will be naturally sorted from the bubble sort insertions
+      if(sorters[j]->start > i) { 
+        if(A[sorters[j]->start] < A[min]) {
+          min = sorters[j]->start;
+          s = j;
         }
       }
     }
-    if(min == -1) {fprintf(stderr, "ERROR: partitions mismatched, total indexes in partitions less than n!\n"); free(temp); free(A); exit(EXIT_FAILURE);}
 
-    temp[i] = A[sorters[min]->start];
-    sorters[min]->start = (sorters[min]->start <= sorters[min]->end) ? sorters[min]->start + 1 : -1; //if we've parsed fully through the partition, set to -1, else increment
+    //if a new min was found, move it to i, then bubble sort the original value of A[i] within its new partition
+    if(min != i) {
+      int temp = A[i];
+      A[i] = A[min];
+      //if min has reached the end of the partition we've searched the whole partition, and we already know temp > A[min], so start at min + 1 
+      while(min < sorters[s]->end && temp > A[min + 1]) { 
+        A[min] = A[min + 1]; //since temp is also larger than min + 1, move min + 1 down
+        min++;
+      }
+      A[min] = temp;
+    }
   }
 
   //now that sorting is done, start freeing stuff
   for(int i = 0; i < num_thread; i++) free(sorters[i]);
-  free(A); //A can be freed now since the fully sorted array is in temp
-  A = temp;
 }
 
 double getMilliSeconds()
