@@ -116,6 +116,7 @@ void mergesort_mt(int *A, int n, int num_thread) {
   int start = 0;
 
   for(int i = 0; i < num_thread; i++) {
+    sorters[i] = (struct parallel_args *)malloc(sizeof(struct parallel_args));
     sorters[i]->A = A;
     sorters[i]->start = start;
     //end = start + inc -1 since mergesort_s is end inclusive, then + 1 if there are still modulus to dole out
@@ -157,6 +158,9 @@ void mergesort_mt(int *A, int n, int num_thread) {
     temp[i] = A[sorters[min]->start];
     sorters[min]->start = (sorters[min]->start <= sorters[min]->end) ? sorters[min]->start + 1 : -1; //if we've parsed fully through the partition, set to -1, else increment
   }
+
+  //now that sorting is done, start freeing stuff
+  for(int i = 0; i < num_thread; i++) free(sorters[i]);
   free(A); //A can be freed now since the fully sorted array is in temp
   A = temp;
 }
