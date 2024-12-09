@@ -139,30 +139,32 @@ void mergesort_mt(int *A, int n, int num_thread) {
   }
 
   //time to finish sorting
-  for(int i = 0; i < n; i++) {
-    int min = i; //min index location, starting at i
-    int s = 0; //min sorters index
+  if(num_thread > 1) { //single thread has already been sorted
+    for(int i = 0; i < n; i++) {
+      int min = i; //min index location, starting at i
+      int s = 0; //min sorters index
 
-    //A[i] within a partition will be the min value for that position, as such start with j = 1 since A[i] is already the smallest value within sorters[0]
-    for(int j = 1; j < num_thread; j++) { 
-      if(sorters[j]->start > i) { 
-        if(A[sorters[j]->start] < A[min]) {
-          min = sorters[j]->start;
-          s = j;
+      //A[i] within a partition will be the min value for that position, as such start with j = 1 since A[i] is already the smallest value within sorters[0]
+      for(int j = 1; j < num_thread; j++) { 
+        if(sorters[j]->start > i) { 
+          if(A[sorters[j]->start] < A[min]) {
+            min = sorters[j]->start;
+            s = j;
+          }
         }
       }
-    }
 
-    //if a new min was found, move it to i, then bubble sort the original value of A[i] within its new partition
-    if(min != i) {
-      int temp = A[i];
-      A[i] = A[min];
-      //if min has reached the end of the partition we've searched the whole partition, and we already know temp > A[min], so start at min + 1 
-      while(min < sorters[s]->end && temp > A[min + 1]) { 
-        A[min] = A[min + 1]; //since temp is also larger than min + 1, move min + 1 down
-        min++;
+      //if a new min was found, move it to i, then bubble sort the original value of A[i] within its new partition
+      if(min != i) {
+        int temp = A[i];
+        A[i] = A[min];
+        //if min has reached the end of the partition we've searched the whole partition, and we already know temp > A[min], so start at min + 1 
+        while(min < sorters[s]->end && temp > A[min + 1]) { 
+          A[min] = A[min + 1]; //since temp is also larger than min + 1, move min + 1 down
+          min++;
+        }
+        A[min] = temp;
       }
-      A[min] = temp;
     }
   }
 
