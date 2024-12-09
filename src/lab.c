@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <limits.h>
 #include <pthread.h>
 #include <sys/time.h> /* for gettimeofday system call */
 #include "lab.h"
@@ -124,7 +125,10 @@ void mergesort_mt(int *A, int n, int num_thread) {
 
     if(pthread_create(&(sorters[i]->tid), NULL, parallel_mergesort, sorters[i]) != 0) {
       perror("Error creating thread!");
-      for(int j = i; j >= 0; j--) free(sorters[j]);
+      for(int j = i; j >= 0; j--) {
+        pthread_cancel(sorters[j]->tid); //cancel allocated threads
+        free(sorters[j]); //free all sorters
+      }
       free(A);
       exit(EXIT_FAILURE);
     }
@@ -138,42 +142,49 @@ void mergesort_mt(int *A, int n, int num_thread) {
     pthread_join(sorters[i]->tid, NULL);
   }
 
-  //time to finish sorting
-  if(num_thread > 1) { //single thread has already been sorted
-    for(int i = 0; i < n; i++) {
-      int min = i; //min index location, starting at i
-      int s = 0; //min sorters index
+  //time to finish merging
+  int shift = 1;
+  int threads = num_thread;
+  static struct parallel_margs arg;
+  while(threads > 1) {
+    shift = shift << 1;
+    threads = threads >> 1;
 
-      //A[i] within a partition will be the min value for that position, as such start with j = 1 since A[i] is already the smallest value within sorters[0]
-      for(int j = 1; j < num_thread; j++) { 
-        if(sorters[j]->start > i) { 
-          if(A[sorters[j]->start] < A[min]) {
-            min = sorters[j]->start;
-            s = j;
-          }
-        }
-      }
+    //loop over the partitions in such a way to be able to merge adjacent partitions, then pass the joined partition to a thread
+    for(int i = 0; i + (shift / 2) < threads; i = i + shift) {
+      arg.args = sorters[i];
+      arg.mid = sorters[i]->end;
+      arg.args->end = sorters[i + (shift / 2)]->end; //merge by setting the end of the first partition to the end of the second
 
-      //if a new min was found, move it to i, then bubble sort the original value of A[i] within its new partition
-      if(min != i) {
-        int temp = A[i];
-        A[i] = A[min];
-        //if min has reached the end of the partition we've searched the whole partition, and we already know temp > A[min], so start at min + 1 
-        while(min < sorters[s]->end && temp > A[min + 1]) { 
-          A[min] = A[min + 1]; //since temp is also larger than min + 1, move min + 1 down
-          min++;
-        }
-        A[min] = temp;
+      if(pthread_create(&(arg.args->tid), NULL, parallel_merge, &arg) != 0) {
+        perror("Error creating thread!");
+        for(int j = 0; j < i; j = j + shift) pthread_cancel(sorters[i]->tid); //cancel created threads
+        for(int j = num_thread - 1; j >= 0; j--) free(sorters[j]); //free all sorters
+        free(A);
+        exit(EXIT_FAILURE);
       }
     }
+
+    for(int i = 0; i < threads; i = i + shift) {
+      pthread_join(sorters[i]->tid, NULL);
+    }
+  }
+  if(threads == 1) { //if num_thread is odd, threads will have one unmerged partition left
+    arg.args = sorters[0];
+    arg.mid = sorters[0]->end;
+    arg.args->end = sorters[num_thread - 1]->end;
+    if(pthread_create(&(arg.args->tid), NULL, parallel_merge, &arg) != 0) {
+      perror("Error creating thread!");
+      for(int j = num_thread - 1; j >= 0; j--) free(sorters[j]); //free all sorters
+      free(A);
+      exit(EXIT_FAILURE);
+    }
+
+    pthread_join(arg.args->tid, NULL);
   }
 
   //now that sorting is done, start freeing stuff
   for(int i = 0; i < num_thread; i++) free(sorters[i]);
-
-  //debugging
-  //for(int i = 0; i < n; i++) printf("%d, ", A[i]);
-  //printf("\n");
 }
 
 double getMilliSeconds()
@@ -184,10 +195,25 @@ double getMilliSeconds()
 }
 
 void *parallel_mergesort(void *args) {
-  if(args == NULL) {perror("Null args passed to parallel mergesort!"); exit(EXIT_FAILURE);}
+  if(args == NULL) {fprintf(stderr, "Null args passed to parallel mergesort!"); exit(EXIT_FAILURE);}
   struct parallel_args *arg = args; //cast args to arg to easier access
   
   mergesort_s(arg->A, arg->start, arg->end); //make use of the existing mergsort function
+
+  pthread_exit(NULL); //thread complete
+}
+
+//parallel merging
+struct parallel_margs {
+  struct parallel_args *args;
+  int mid;
+};
+
+void *parallel_merge(void *args) {
+  if(args == NULL) {fprintf(stderr, "Null args passed to parallel merge!"); exit(EXIT_FAILURE);}
+  struct parallel_margs *arg = args; //cast args to arg to easier access
+  
+  merge_s(arg->args->A, arg->args->start, arg->mid, arg->args->end); //make use of the existing mergsort function
 
   pthread_exit(NULL); //thread complete
 }
