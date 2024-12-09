@@ -144,7 +144,7 @@ void mergesort_mt(int *A, int n, int num_thread) {
     int s = 0; //min sorters index
 
     //A[i] within a partition will be the min value for that position, as such start with j = 1 since A[i] is already the smallest value within sorters[0]
-    for(int j = 1; j < num_thread -1; j++) { //the final partition will be naturally sorted from the bubble sort insertions
+    for(int j = 1; j < num_thread; j++) { 
       if(sorters[j]->start > i) { 
         if(A[sorters[j]->start] < A[min]) {
           min = sorters[j]->start;
@@ -168,6 +168,10 @@ void mergesort_mt(int *A, int n, int num_thread) {
 
   //now that sorting is done, start freeing stuff
   for(int i = 0; i < num_thread; i++) free(sorters[i]);
+
+  //debugging
+  //for(int i = 0; i < n; i++) printf("%d, ", A[i]);
+  //printf("\n");
 }
 
 double getMilliSeconds()
