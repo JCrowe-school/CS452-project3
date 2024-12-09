@@ -26,5 +26,7 @@ int main(int argc, char **argv)
   end = getMilliSeconds();
   printf("%f %d\n",end-start, t);
 
+  free(A_); //if you're going to give us this code, can you at least make sure we can just run it without needing to fix it?
+
   return 0;
 }
