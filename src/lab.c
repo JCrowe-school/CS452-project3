@@ -178,7 +178,7 @@ void mergesort_mt(int *A, int n, int num_thread) {
       }
     }
 
-    for(int i = 0; i < num_thread; i = i + shift) {
+    for(int i = 0; i < num_thread / shift; i = i + shift) {
       pthread_join(sorters[i]->tid, NULL);
     }
 
