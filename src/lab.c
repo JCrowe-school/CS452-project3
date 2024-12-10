@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <limits.h>
 #include <pthread.h>
 #include <sys/time.h> /* for gettimeofday system call */
 #include "lab.h"
@@ -186,17 +185,7 @@ void mergesort_mt(int *A, int n, int num_thread) {
     shift = shift << 1;
   }
   if(num_thread != 1 && num_thread % 2 == 1) { //if num_thread is odd, threads will have one unmerged partition left
-    arg.args = sorters[0];
-    arg.mid = sorters[0]->end; 
-    arg.args->end = sorters[num_thread - 1]->end;
-    if(pthread_create(&(arg.args->tid), NULL, parallel_merge, &arg) != 0) {
-      perror("Error creating thread!");
-      for(int j = num_thread - 1; j >= 0; j--) free(sorters[j]); //free all sorters
-      free(A);
-      exit(EXIT_FAILURE);
-    }
-
-    pthread_join(arg.args->tid, NULL);
+    merge_s(A, sorters[0]->start, sorters[0]->end, sorters[num_thread - 1]->end); //just call directly, no need to delegate this out
   }
 
   //debugging
